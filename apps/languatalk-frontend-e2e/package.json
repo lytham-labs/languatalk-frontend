@@ -1,0 +1,10 @@
+{
+  "name": "@languatalk-frontend/languatalk-frontend-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@languatalk-frontend/languatalk-frontend"
+    ]
+  }
+}

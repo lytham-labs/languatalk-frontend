@@ -1,0 +1,46 @@
+// features.js
+export const unlimitedPlanFeatures = [
+    "Human-like AI voices cloned from native speakers (multiple dialects)",
+    "Huge choice of conversations designed for learning (e.g. roleplays, debates, vocab & grammar practice)",
+    "Hands-free settings for seamless conversation",
+    "Get corrections and explanations for mistakes in one click",
+    "See alternative ways of saying what you said",
+    "Instant translation (includes multiple meanings, usage examples, related phrases & synonyms)",
+    "Save words, phrases & sentences then learn them efficiently with spaced repetition flashcards",
+    "Reinforce new vocab by generating short AI stories that incorporate your saved words.",
+    "Switch to your native language when stuck & still be understood",
+    "Words highlighted as you listen to aid understanding",
+    "Get a detailed feedback report for each conversation",
+    "Full conversation history - review & continue chats later",
+    "Download transcripts for review",
+    "Choose between the world’s best AI text, voice & transcription models",
+    "Choose your preferred mode: listen first, listen and read, and text-only",
+    "Generate flashcards with AI (words & contextual sentences)",
+    "Import vocab/flashcards",
+    "(coming soon) - Pronunciation feedback (Spanish, French & English only)",
+    "Podcast and video player with interactive transcripts & instant translation (web only)",
+    "Import texts for reading practice (optionally add audio, web only)"
+];
+
+export const communicatePlanFeatures = [
+    "Human-like AI voices cloned from native speakers (multiple dialects)",
+    "Huge choice of conversations designed for learning (e.g. roleplays, debates, vocab & grammar practice)",
+    "Hands-free settings for seamless conversation",
+    "Get corrections and explanations for mistakes in one click",
+    "See alternative ways of saying what you said",
+    "Instant translation (includes multiple meanings, usage examples, related phrases & synonyms)",
+    "Save words, phrases & sentences then learn them efficiently with spaced repetition flashcards",
+    "Reinforce new vocab by generating short AI stories that incorporate your saved words.",
+    "Switch to your native language when stuck & still be understood",
+    "Words highlighted as you listen to aid understanding",
+    "Get a detailed feedback report for each conversation",
+    "Full conversation history - review & continue chats later",
+    "Download transcripts for review",
+    "Choose between the world’s best AI text, voice & transcription models",
+    "Choose your preferred mode: listen first, listen and read, and text-only",
+    "Generate flashcards with AI (words & contextual sentences)",
+    "Import vocab/flashcards",
+    "(coming soon) - Pronunciation feedback (Spanish, French & English only)",
+    "Podcast and video player with interactive transcripts & instant translation (web only)",
+    "Import texts for reading practice (optionally add audio, web only)"
+];

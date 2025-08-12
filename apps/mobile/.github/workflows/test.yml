@@ -1,0 +1,49 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.19.2]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Create .npmrc
+      run: |
+        echo "@fortawesome:registry=https://npm.fontawesome.com/" > .npmrc
+        echo "@awesome.me:registry=https://npm.fontawesome.com/" >> .npmrc
+        echo "//npm.fontawesome.com/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Install additional dependencies
+      run: |
+        npm install --save-dev @testing-library/react-native jest jest-expo @babel/core @babel/preset-env @babel/preset-typescript @babel/preset-react
+
+    - name: Run tests
+      run: npm run test:ci
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          coverage/
+          .jest-cache/ 

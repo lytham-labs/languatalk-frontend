@@ -1,0 +1,41 @@
+{
+  "cli": {
+    "version": ">= 10.2.2"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_LANGUA_API_URL": "https://mobile-staging.languatalk.com",
+        "EXPO_PUBLIC_LANGUA_WS_URL": "wss://anycable-mobile-staging.languatalk.com/cable",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": process.env.GOOGLE_ANDROID_CLIENT_ID,
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": process.env.GOOGLE_IOS_CLIENT_ID,
+        "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": process.env.GOOGLE_EXPO_CLIENT_ID
+      }
+    },
+    "simulator": {
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_LANGUA_API_URL": "https://languatalk.com",
+        "EXPO_PUBLIC_LANGUA_WS_URL": "wss://anycable.languatalk.com/cable",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": process.env.GOOGLE_ANDROID_CLIENT_ID,
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": process.env.GOOGLE_IOS_CLIENT_ID,
+        "EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID": process.env.GOOGLE_EXPO_CLIENT_ID
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

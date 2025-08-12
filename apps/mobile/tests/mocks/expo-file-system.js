@@ -1,0 +1,16 @@
+export default {
+  documentDirectory: '/mock/document/directory',
+  cacheDirectory: '/mock/cache/directory',
+  readAsStringAsync: jest.fn(),
+  writeAsStringAsync: jest.fn(),
+  getInfoAsync: jest.fn(),
+  makeDirectoryAsync: jest.fn(),
+  deleteAsync: jest.fn(),
+  moveAsync: jest.fn(),
+  copyAsync: jest.fn(),
+  readDirectoryAsync: jest.fn(),
+  downloadAsync: jest.fn(),
+  uploadAsync: jest.fn(),
+  createAssetAsync: jest.fn(),
+  getContentUriAsync: jest.fn(),
+}; 

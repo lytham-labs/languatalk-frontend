@@ -1,0 +1,46 @@
+# Example: Add this step to your existing workflows
+
+      - name: Notify Slack - OTA Deployed
+        if: success() && github.event_name == 'pull_request'
+        run: |
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "🚀 OTA Update Deployed to Preview",
+              "blocks": [{
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*PR:* <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }}>\n*Title:* ${{ github.event.pull_request.title }}\n*Author:* ${{ github.event.pull_request.user.login }}\n*Status:* OTA deployed to preview channel"
+                }
+              }]
+            }'
+
+      - name: Notify Discord - Build Started
+        if: github.event_name == 'pull_request'
+        run: |
+          curl -X POST ${{ secrets.DISCORD_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "embeds": [{
+                "title": "📱 Preview Builds Started",
+                "description": "Native changes detected - building apps",
+                "url": "${{ github.event.pull_request.html_url }}",
+                "color": 3447003,
+                "fields": [
+                  {
+                    "name": "PR",
+                    "value": "#${{ github.event.pull_request.number }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Author",
+                    "value": "${{ github.event.pull_request.user.login }}",
+                    "inline": true
+                  }
+                ],
+                "footer": {
+                  "text": "EAS Build"
+                }
+              }]
+            }'

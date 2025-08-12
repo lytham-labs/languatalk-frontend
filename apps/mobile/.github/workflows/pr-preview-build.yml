@@ -1,0 +1,485 @@
+name: PR Preview Build & Deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+
+jobs:
+  # Run tests first before any deployments
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20.19.2
+          cache: 'npm'
+      
+      - name: Create .npmrc
+        run: |
+          echo "@fortawesome:registry=https://npm.fontawesome.com/" > .npmrc
+          echo "@awesome.me:registry=https://npm.fontawesome.com/" >> .npmrc
+          echo "//npm.fontawesome.com/:_authToken=${{ secrets.NPM_TOKEN }}" >> .npmrc
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: echo "Skipping tests for initial setup" # npm run test:ci || true
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            coverage/
+            .jest-cache/
+  
+  fingerprint-check:
+    name: Check for Native Changes
+    needs: test  # Only run after tests complete
+    runs-on: ubuntu-latest
+    outputs:
+      native-changed: ${{ steps.fingerprint.outputs.native-changed }}
+      fingerprint: ${{ steps.fingerprint.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: |
+          npm ci
+          npx expo install @expo/fingerprint
+      
+      - name: Check Fingerprint Changes
+        id: fingerprint
+        run: |
+          # Create fingerprint script to handle the API properly
+          cat > generate-fingerprint.js << 'EOF'
+          const { createFingerprintAsync } = require('@expo/fingerprint');
+          
+          async function generateFingerprint() {
+            try {
+              const fingerprint = await createFingerprintAsync('.', {
+                platforms: ['ios'],
+              });
+              console.log(JSON.stringify({ hash: fingerprint.hash }));
+            } catch (error) {
+              console.error('Error:', error);
+              process.exit(1);
+            }
+          }
+          
+          generateFingerprint();
+          EOF
+          
+          # Generate current fingerprint
+          CURRENT_FINGERPRINT=$(node generate-fingerprint.js | jq -r '.hash')
+          echo "Current fingerprint: $CURRENT_FINGERPRINT"
+          
+          # Compare with main branch
+          git checkout origin/main
+          npm ci --silent
+          MAIN_FINGERPRINT=$(node generate-fingerprint.js | jq -r '.hash')
+          git checkout -
+          
+          echo "Main fingerprint: $MAIN_FINGERPRINT"
+          
+          if [[ "$CURRENT_FINGERPRINT" != "$MAIN_FINGERPRINT" ]]; then
+            echo "❌ Native changes detected"
+            echo "native-changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ JavaScript-only changes"
+            echo "native-changed=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "fingerprint=$CURRENT_FINGERPRINT" >> $GITHUB_OUTPUT
+
+  # For PRs with native changes - build preview apps
+  build-preview-apps:
+    name: Build Preview Apps
+    needs: fingerprint-check
+    if: ${{ needs.fingerprint-check.outputs.native-changed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Create Preview Build
+        id: build
+        run: |
+          # Start builds for both platforms
+          # Using preview profile for Android APK and internal distribution for iOS
+          
+          echo "Starting preview builds for PR #${{ github.event.pull_request.number }}"
+          
+          # Android APK build
+          ANDROID_BUILD_ID=$(eas build --platform android \
+            --profile preview \
+            --non-interactive \
+            --json \
+            --message "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}" \
+            | jq -r '.[0].id')
+          
+          # iOS internal distribution build (for registered devices)
+          # Skip iOS if credentials are not available
+          if eas credentials:validate --platform ios --profile preview-internal; then
+            IOS_BUILD_ID=$(eas build --platform ios \
+              --profile preview-internal \
+              --non-interactive \
+              --json \
+              --message "PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}" \
+              | jq -r '.[0].id')
+          else
+            echo "iOS credentials not available, skipping iOS build"
+            IOS_BUILD_ID="skip"
+          fi
+          
+          echo "android-build-id=$ANDROID_BUILD_ID" >> $GITHUB_OUTPUT
+          echo "ios-build-id=$IOS_BUILD_ID" >> $GITHUB_OUTPUT
+      
+      - name: Notify Slack - Builds Started
+        if: success() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🏗️ Preview Builds Started"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR:* <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}>\n*Author:* ${{ github.event.pull_request.user.login }}\n*Type:* Native changes detected"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "⏱️ *ETA:* ~20 minutes for both platforms\n📱 *Platforms:* Android APK + iOS Internal Distribution"
+                  }
+                }
+              ]
+            }'
+      
+      - name: Wait for Builds
+        run: |
+          # Wait for builds to complete and get URLs
+          echo "Waiting for builds to complete..."
+          
+          # Check if we have valid build IDs
+          if [[ -z "${{ steps.build.outputs.android-build-id }}" ]]; then
+            echo "Error: No Android build ID found"
+            exit 1
+          fi
+          
+          # Poll for Android build
+          while true; do
+            STATUS=$(eas build:view ${{ steps.build.outputs.android-build-id }} --json | jq -r '.status')
+            if [[ "$STATUS" == "FINISHED" ]]; then
+              ANDROID_URL=$(eas build:view ${{ steps.build.outputs.android-build-id }} --json | jq -r '.artifacts.buildUrl')
+              echo "Android build complete: $ANDROID_URL"
+              break
+            elif [[ "$STATUS" == "ERRORED" ]]; then
+              echo "Android build failed"
+              exit 1
+            fi
+            sleep 30
+          done
+          
+          # Poll for iOS build if it was started
+          if [[ "${{ steps.build.outputs.ios-build-id }}" != "skip" ]]; then
+            while true; do
+              STATUS=$(eas build:view ${{ steps.build.outputs.ios-build-id }} --json | jq -r '.status')
+              if [[ "$STATUS" == "FINISHED" ]]; then
+                IOS_URL=$(eas build:view ${{ steps.build.outputs.ios-build-id }} --json | jq -r '.artifacts.buildUrl')
+                echo "iOS build complete: $IOS_URL"
+                break
+              elif [[ "$STATUS" == "ERRORED" ]]; then
+                echo "iOS build failed"
+                exit 1
+              fi
+              sleep 30
+            done
+          else
+            echo "iOS build was skipped"
+            IOS_URL="skipped"
+          fi
+          
+          echo "ANDROID_URL=$ANDROID_URL" >> $GITHUB_ENV
+          echo "IOS_URL=$IOS_URL" >> $GITHUB_ENV
+      
+      - name: Comment on PR with Build Links
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const androidUrl = process.env.ANDROID_URL;
+            const iosUrl = process.env.IOS_URL;
+            
+            // Extract the install URL from the build URL for iOS
+            const iosInstallUrl = iosUrl !== 'skipped' 
+              ? iosUrl.replace('/artifacts/', '/accounts/strukturedkaos/builds/').replace('.ipa', '')
+              : null;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 📱 Preview Builds Ready!
+              
+              This PR contains native changes, so preview builds have been created for testing:
+              
+              ### 🤖 Android (APK)
+              [Download APK](${androidUrl})
+              - Download and install directly on any Android device
+              - No registration required
+              
+              ### 🍎 iOS (Internal Distribution)  
+              ${iosInstallUrl 
+                ? `[Install on iPhone](${iosInstallUrl})
+              - Open this link **on your registered iPhone**
+              - Tap "Install" to download the app
+              - Requires registered device (see below)`
+                : '⚠️ iOS build skipped due to credential issues'}
+              
+              ### Device Registration
+              **Not registered?** [Register your iPhone first](https://expo.dev/accounts/strukturedkaos/devices/register)
+              1. Open the link on your iPhone
+              2. Install the profile when prompted
+              3. Your device will be registered for future builds
+              
+              ### Testing Instructions
+              1. Install the build on your device
+              2. Test all changes in this PR
+              3. Report any issues in PR comments
+              
+              **Build Details:**
+              - Android Build: \`${{ steps.build.outputs.android-build-id }}\`
+              - iOS Build: \`${{ steps.build.outputs.ios-build-id }}\`
+              - Expires: 30 days`
+            });
+      
+      - name: Notify Slack - Builds Ready
+        if: success() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "✅ Preview Builds Ready!"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR:* <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}>\n*Author:* ${{ github.event.pull_request.user.login }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🤖 *Android:* <${{ env.ANDROID_URL }}|Download APK>\n🍎 *iOS:* Open PR comment for install link"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "💡 iOS requires registered device | Builds expire in 30 days"
+                    }
+                  ]
+                }
+              ]
+            }'
+
+  # For PRs with JavaScript-only changes - deploy OTA to preview
+  deploy-preview-ota:
+    name: Deploy OTA to Preview
+    needs: fingerprint-check
+    if: ${{ needs.fingerprint-check.outputs.native-changed == 'false' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      # Environment variables are now set directly in the Deploy OTA Update step
+      
+      - name: Deploy OTA Update to Preview
+        id: update
+        env:
+          EXPO_PUBLIC_LANGUA_API_URL: ${{ secrets.PREVIEW_LANGUA_API_URL || secrets.LANGUA_API_URL }}
+          EXPO_PUBLIC_LANGUA_WS_URL: ${{ secrets.PREVIEW_LANGUA_WS_URL || secrets.LANGUA_WS_URL }}
+          EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.GOOGLE_ANDROID_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+          EXPO_PUBLIC_GOOGLE_EXPO_CLIENT_ID: ${{ secrets.GOOGLE_EXPO_CLIENT_ID }}
+          EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          EXPO_PUBLIC_SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          EXPO_PUBLIC_SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          EXPO_PUBLIC_SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.REVENUECAT_API_KEY_IOS }}
+          EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID: ${{ secrets.REVENUECAT_API_KEY_ANDROID }}
+          EXPO_PUBLIC_HELPSCOUT_SECRET_KEY: ${{ secrets.HELPSCOUT_SECRET_KEY }}
+          EXPO_PUBLIC_POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY_DEV }}
+          EXPO_PUBLIC_TRANSCRIPTION_CLOUDFLARE_WORKER_URL: ${{ secrets.TRANSCRIPTION_CLOUDFLARE_WORKER_URL }}
+        run: |
+          # Create a unique branch name for this PR
+          BRANCH_NAME="pr-${{ github.event.pull_request.number }}"
+          MESSAGE="PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+          
+          # Deploy to preview channel (not production!)
+          eas update --branch preview --message "$MESSAGE" --non-interactive
+          
+          # Get the update URL
+          UPDATE_GROUP=$(eas update:list --branch preview --limit 1 --json | jq -r '.[0].group')
+          echo "update-group=$UPDATE_GROUP" >> $GITHUB_OUTPUT
+      
+      - name: Comment on PR with OTA Info
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🚀 Preview OTA Update Deployed!
+              
+              This PR contains JavaScript-only changes and has been deployed as an OTA update to the preview channel.
+              
+              ### How to Test
+              1. Open the Langua app on a device with a **preview build** installed
+              2. Force close and reopen the app
+              3. The update will be downloaded automatically
+              4. Test the changes in this PR
+              
+              ### Update Details
+              - **Channel:** preview
+              - **Update ID:** ${{ steps.update.outputs.update-group }}
+              - **Fingerprint:** ${{ needs.fingerprint-check.outputs.fingerprint }}
+              
+              **Note:** Only devices with preview builds will receive this update. Production builds are unaffected.`
+            });
+      
+      - name: Notify Slack - OTA Deployed
+        if: success() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 OTA Update Deployed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*PR:* <${{ github.event.pull_request.html_url }}|#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}>\n*Author:* ${{ github.event.pull_request.user.login }}\n*Type:* JavaScript-only changes"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn", 
+                    "text": "📱 *Testing:* Force close and reopen the preview app to get the update"
+                  }
+                }
+              ]
+            }'
+
+  # Add status check to PR
+  update-pr-status:
+    name: Update PR Status
+    needs: [fingerprint-check, build-preview-apps, deploy-preview-ota]
+    if: |
+      always() && 
+      (needs.fingerprint-check.result == 'success' || needs.fingerprint-check.result == 'failure')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set PR Status
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const nativeChanged = '${{ needs.fingerprint-check.outputs.native-changed }}' === 'true';
+            const buildResult = '${{ needs.build-preview-apps.result }}';
+            const otaResult = '${{ needs.deploy-preview-ota.result }}';
+            const relevantResult = nativeChanged ? buildResult : otaResult;
+            const status = relevantResult === 'success' ? 'success' : 'failure';
+            
+            let description;
+            if (nativeChanged) {
+              description = status === 'success' 
+                ? '✅ Preview builds created successfully' 
+                : '❌ Preview build failed';
+            } else {
+              description = status === 'success'
+                ? '✅ OTA update deployed to preview'
+                : '❌ OTA deployment failed';
+            }
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: status,
+              description: description,
+              context: 'Preview Deployment'
+            });

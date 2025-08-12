@@ -1,0 +1,1 @@
+declare module '@charlescoeder/react-native-kuromoji'; 

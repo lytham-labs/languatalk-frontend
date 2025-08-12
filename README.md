@@ -1,19 +1,188 @@
-# LanguatalkFrontend
+# LanguaTalk Frontend
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+LanguaTalk Frontend - Nx workspace with React Native/Expo mobile app for language learning platform.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/react-native?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+## Project Structure
 
-## Finish your CI setup
+This is an Nx monorepo containing:
+- **Mobile App** (`apps/mobile/`) - React Native/Expo mobile application
+- **Web Frontend** (`apps/languatalk-frontend/`) - Web application (future)
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/OKd5PGWK5F)
+## Prerequisites
 
+- Node.js (version specified in `.nvmrc`)
+- npm or yarn
+- iOS development: Xcode and Xcode Command Line Tools
+- Android development: Android Studio and Android SDK (optional)
+- FontAwesome Pro access (see setup below)
 
-## Run tasks
+## Setup Instructions
 
-To run the dev server for your app, use:
+### 1. Clone and Install Dependencies
+
+```bash
+git clone https://github.com/lytham-labs/languatalk-frontend.git
+cd languatalk-frontend
+
+# Install root dependencies
+npm install
+```
+
+### 2. FontAwesome Pro Setup
+
+The mobile app uses FontAwesome Pro icons. You need to create an `.npmrc` file in the mobile directory with your FontAwesome Pro token:
+
+```bash
+# Navigate to mobile app directory
+cd apps/mobile
+
+# Create .npmrc file with your FontAwesome Pro token
+cat > .npmrc << 'EOF'
+@fortawesome:registry=https://npm.fontawesome.com/
+@awesome.me:registry=https://npm.fontawesome.com/
+//npm.fontawesome.com/:_authToken=YOUR_FONTAWESOME_TOKEN_HERE
+EOF
+```
+
+**Replace `YOUR_FONTAWESOME_TOKEN_HERE` with your actual FontAwesome Pro token.**
+
+### 3. Mobile App Setup
+
+```bash
+# Install mobile app dependencies (from apps/mobile directory)
+npm install
+
+# Install iOS dependencies (required for iOS)
+cd ios
+pod install
+cd ..
+
+# Return to project root
+cd ../..
+```
+
+### 4. Environment Setup
+
+Create environment files as needed:
+
+```bash
+# In the mobile app directory (apps/mobile/)
+# Create .env.local with your environment variables
+# Examples might include:
+# API_URL=https://your-api-url.com
+# SENTRY_DSN=your-sentry-dsn
+# etc.
+```
+
+## Running the Mobile App
+
+### iOS Development
+
+```bash
+# From project root - run iOS simulator
+npx nx ios mobile
+
+# Alternative: run from mobile directory
+cd apps/mobile
+npm run ios
+```
+
+### Android Development (Optional)
+
+```bash
+# From project root - run Android emulator
+npx nx android mobile
+
+# Alternative: run from mobile directory
+cd apps/mobile
+npm run android
+```
+
+### Development Server (Expo)
+
+```bash
+# Start Expo development server
+npx nx start mobile
+
+# Alternative: from mobile directory
+cd apps/mobile
+npm start
+```
+
+## Quick Setup (All Steps Combined)
+
+For convenience, here's the complete setup:
+
+```bash
+# Clone and setup
+git clone https://github.com/lytham-labs/languatalk-frontend.git
+cd languatalk-frontend
+npm install
+
+# Setup FontAwesome Pro and mobile app
+cd apps/mobile
+
+# IMPORTANT: Replace YOUR_FONTAWESOME_TOKEN_HERE with your actual token
+cat > .npmrc << 'EOF'
+@fortawesome:registry=https://npm.fontawesome.com/
+@awesome.me:registry=https://npm.fontawesome.com/
+//npm.fontawesome.com/:_authToken=YOUR_FONTAWESOME_TOKEN_HERE
+EOF
+
+# Install dependencies and iOS pods
+npm install
+cd ios
+pod install
+cd ../..
+
+# Ready to run!
+npx nx ios mobile
+```
+
+## Troubleshooting
+
+### iOS Build Issues
+
+If you encounter iOS build issues:
+
+1. **Clean and rebuild iOS dependencies:**
+   ```bash
+   cd apps/mobile/ios
+   pod deintegrate
+   pod install
+   cd ..
+   ```
+
+2. **Clear Expo cache:**
+   ```bash
+   cd apps/mobile
+   npx expo start --clear
+   ```
+
+3. **Reset Metro cache:**
+   ```bash
+   cd apps/mobile
+   npx expo start --clear
+   watchman watch-del-all  # if watchman is installed
+   ```
+
+### FontAwesome Pro Issues
+
+If you encounter FontAwesome Pro authentication errors:
+- Ensure you have a valid FontAwesome Pro subscription
+- Check that your token is correctly placed in `apps/mobile/.npmrc`
+- Try running `npm install` again in the `apps/mobile` directory
+
+### React Native Version
+
+- This project uses **React Native 0.74.5**
+- Ensure all React Native related packages are compatible with this version
+
+## Other Nx Tasks
+
+To run the web dev server:
 
 ```sh
 npx nx serve languatalk-frontend
@@ -28,10 +197,9 @@ npx nx build languatalk-frontend
 To see all available targets to run for a project, run:
 
 ```sh
+npx nx show project mobile
 npx nx show project languatalk-frontend
 ```
-
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
 
 [More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 

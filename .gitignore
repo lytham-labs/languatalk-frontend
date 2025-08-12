@@ -117,3 +117,16 @@ test-output
 
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
+
+# Environment files - NEVER COMMIT SECRETS
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# NPM configuration files - NEVER COMMIT TOKENS
+.npmrc
+*/.npmrc
+**/.npmrc

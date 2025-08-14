@@ -16,6 +16,23 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["development"]
+    "customConditions": ["development"],
+    "paths": {
+      "@languatalk-frontend/data-access-auth": [
+        "libs/data-access/auth/src/index.ts"
+      ],
+      "@languatalk-frontend/data-access-user-settings": [
+        "libs/data-access/user-settings/src/index.ts"
+      ],
+      "@languatalk-frontend/data-access-websocket": [
+        "libs/data-access/websocket/src/index.ts"
+      ],
+      "@languatalk-frontend/ui-shared-layout": [
+        "libs/ui/shared-layout/src/index.ts"
+      ],
+      "@languatalk-frontend/util-reading-aid": [
+        "libs/util/reading-aid/src/index.ts"
+      ]
+    }
   }
 }

@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../../dist/libs/ui/shared-layout",
+    "declaration": true,
+    "types": ["node"],
+    "lib": ["dom", "dom.iterable", "es6"],
+    "target": "es2015",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@languatalk-frontend/data-access-auth": ["../../../dist/libs/data-access/auth"],
+      "@languatalk-frontend/data-access-user-settings": ["../../../dist/libs/data-access/user-settings"],
+      "@languatalk-frontend/data-access-websocket": ["../../../dist/libs/data-access/websocket"],
+      "@languatalk-frontend/util-reading-aid": ["../../../dist/libs/util/reading-aid"]
+    },
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.test.tsx"
+  ]
+}

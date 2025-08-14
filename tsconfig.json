@@ -10,7 +10,28 @@
       "path": "./apps/languatalk-frontend"
     },
     {
-      "path": "./ui/components"
+      "path": "./apps/speak-e2e"
+    },
+    {
+      "path": "./apps/speak"
+    },
+    {
+      "path": "./shared/context"
+    },
+    {
+      "path": "./libs/data-access/user-settings"
+    },
+    {
+      "path": "./libs/data-access/websocket"
+    },
+    {
+      "path": "./libs/data-access/auth"
+    },
+    {
+      "path": "./libs/ui/shared-layout"
+    },
+    {
+      "path": "./libs/util/reading-aid"
     }
   ]
 }

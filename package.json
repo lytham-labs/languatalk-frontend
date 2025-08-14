@@ -90,6 +90,8 @@
   },
   "workspaces": [
     "apps/*",
-    "ui/*"
+    "ui/*",
+    "/apps/speak",
+    "/shared/context"
   ]
 }

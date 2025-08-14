@@ -3,9 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "jsx": "react-native"
   },
@@ -15,5 +13,19 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
+  ],
+  "references": [
+    {
+      "path": "../../libs/data-access/websocket"
+    },
+    {
+      "path": "../../libs/data-access/user-settings"
+    },
+    {
+      "path": "../../libs/util/reading-aid"
+    },
+    {
+      "path": "../../libs/data-access/auth"
+    }
   ]
 }
